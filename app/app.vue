@@ -3,9 +3,8 @@
     <header class="app-header">
       <div class="logo-area">
         <span class="logo-icon">📊</span>
-        <h1>Grafana Faro + Nuxt Observability</h1>
+        <h1>Grafana Faro </h1>
       </div>
-      <p class="subtitle">Production-Ready Logging & Exception Tracking for Nuxt 4 & Grafana Cloud</p>
     </header>
 
     <main class="dashboard">
