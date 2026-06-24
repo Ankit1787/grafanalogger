@@ -1,4 +1,4 @@
-import { initializeFaro, getWebInstrumentations, LogLevel, type Faro } from '@grafana/faro-web-sdk'
+import { initializeFaro, getWebInstrumentations, LogLevel, type Faro, NavigationInstrumentation } from '@grafana/faro-web-sdk'
 import { TracingInstrumentation } from '@grafana/faro-web-tracing'
 
 type FaroLogger = {
@@ -45,7 +45,8 @@ export default defineNuxtPlugin<{ faro: Faro | null; faroLogger: FaroLogger }>((
         },
         instrumentations: [
           ...getWebInstrumentations(),
-          new TracingInstrumentation()
+          new TracingInstrumentation(),
+          new NavigationInstrumentation()
         ]
       })
 

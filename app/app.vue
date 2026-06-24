@@ -45,6 +45,21 @@
             <button @click="triggerClientUncaughtError" class="btn btn-error-uncaught">
               Trigger Uncaught Exception
             </button>
+            <button @click="triggerClientEvent" class="btn btn-event">
+              Emit Custom Event (add_to_cart)
+            </button>
+            <button @click="triggerClientMeasurement" class="btn btn-measurement">
+              Emit Custom Measurement
+            </button>
+            <button @click="triggerCustomSpan" class="btn btn-span">
+              Run Custom OTEL Span
+            </button>
+            <button @click="triggerUserAction" class="btn btn-action" data-faro-user-action-name="auto-tracked-btn-action">
+              Start Manual & Auto User Action
+            </button>
+            <button @click="triggerUpdateSession" class="btn btn-session">
+              Update Session Meta (setSession)
+            </button>
           </div>
         </div>
 
@@ -139,11 +154,74 @@ const triggerClientUncaughtError = () => {
   undefinedObject.triggerCrash()
 }
 
+const triggerClientEvent = () => {
+  const logger = useAppLogger()
+  logger.event('add_to_cart', { productId: 'prod_882', quantity: '2', price: '49.99' }, 'e-commerce')
+  addLocalLog('info', `[Client] Emitted custom event 'add_to_cart' to Faro`)
+}
+
+const triggerClientMeasurement = () => {
+  const logger = useAppLogger()
+  logger.measurement('checkout_form_completion', { duration_ms: 1850 }, { checkoutStep: 'shipping' })
+  addLocalLog('info', `[Client] Emitted custom measurement 'checkout_form_completion' to Faro`)
+}
+
+const triggerCustomSpan = async () => {
+  const logger = useAppLogger()
+  addLocalLog('info', `[Client] Starting custom OpenTelemetry span 'process_payment'...`)
+  
+  try {
+    await logger.runWithSpan('process_payment', { gateway: 'stripe', currency: 'USD' }, async () => {
+      // Simulate heavy asynchronous operation (e.g. API request)
+      await new Promise((resolve) => setTimeout(resolve, 800))
+    })
+    addLocalLog('success', `[Client] Completed custom OTEL span 'process_payment' successfully`)
+  } catch (err) {
+    addLocalLog('error', `[Client] Custom OTEL span failed: ${err.message}`)
+  }
+}
+
+const triggerUserAction = () => {
+  const logger = useAppLogger()
+  logger.startUserAction('manual-dashboard-interaction', { clickSource: 'user-action-btn' })
+  addLocalLog('info', `[Client] Manual user action 'manual-dashboard-interaction' started.`)
+  addLocalLog('info', `[Client] Auto tracked action 'auto-tracked-btn-action' also triggered by HTML attribute.`)
+}
+
+const triggerUpdateSession = () => {
+  const logger = useAppLogger()
+  const current = logger.getSession()
+  
+  // Set custom attributes on session
+  logger.setSession({
+    ...current,
+    attributes: {
+      ...current?.attributes,
+      userRole: 'admin',
+      membership: 'gold',
+      updatedAt: new Date().toISOString()
+    }
+  })
+  
+  const updated = logger.getSession()
+  addLocalLog('success', `[Client] Session updated! Attributes: ${JSON.stringify(updated?.attributes || {})}`)
+}
+
 // Server Side Actions
 const triggerServerLog = async () => {
   addLocalLog('info', `[Server] Triggering server-side log via /api/test-error...`)
+  
+  const faro = useNuxtApp().$faro
+  const headers = {}
+  if (faro) {
+    const session = faro.api.getSession()
+    if (session?.id) {
+      headers['X-Faro-Session-Id'] = session.id
+    }
+  }
+
   try {
-    const res = await $fetch('/api/test-error?type=log')
+    const res = await $fetch('/api/test-error?type=log', { headers })
     addLocalLog('success', `[Server Response] ${res.message}`)
   } catch (err) {
     addLocalLog('error', `[Server Error] Failed to contact server route: ${err.message}`)
@@ -152,8 +230,18 @@ const triggerServerLog = async () => {
 
 const triggerServerException = async () => {
   addLocalLog('warn', `[Server] Triggering server-side 500 error via /api/test-error...`)
+  
+  const faro = useNuxtApp().$faro
+  const headers = {}
+  if (faro) {
+    const session = faro.api.getSession()
+    if (session?.id) {
+      headers['X-Faro-Session-Id'] = session.id
+    }
+  }
+
   try {
-    await $fetch('/api/test-error?type=exception')
+    await $fetch('/api/test-error?type=exception', { headers })
   } catch (err) {
     addLocalLog('error', `[Server Response 500] Unhandled server exception captured! Check server console & Faro logs.`)
   }
@@ -390,6 +478,51 @@ body {
 .btn-error-uncaught:hover {
   filter: brightness(1.15);
   box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+}
+
+.btn-event {
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.25);
+}
+.btn-event:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+
+.btn-measurement {
+  background: linear-gradient(135deg, #14b8a6, #0d9488);
+  box-shadow: 0 4px 10px rgba(20, 184, 166, 0.25);
+}
+.btn-measurement:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 4px 15px rgba(20, 184, 166, 0.4);
+}
+
+.btn-span {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  box-shadow: 0 4px 10px rgba(99, 102, 241, 0.25);
+}
+.btn-span:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+}
+
+.btn-action {
+  background: linear-gradient(135deg, #ec4899, #be185d);
+  box-shadow: 0 4px 10px rgba(236, 72, 153, 0.25);
+}
+.btn-action:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4);
+}
+
+.btn-session {
+  background: linear-gradient(135deg, #f43f5e, #e11d48);
+  box-shadow: 0 4px 10px rgba(244, 63, 94, 0.25);
+}
+.btn-session:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 4px 15px rgba(244, 63, 94, 0.4);
 }
 
 .btn-server-log {

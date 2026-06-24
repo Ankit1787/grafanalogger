@@ -53,9 +53,9 @@ function parseStacktrace(stack?: string): FaroStacktrace {
     if (match) {
       frames.push({
         function: match[1] || undefined,
-        filename: match[2],
-        lineno: parseInt(match[3], 10),
-        colno: parseInt(match[4], 10)
+        filename: match[2]||"",
+        lineno: parseInt(match[3] || "0", 10),
+        colno: match[4] ? parseInt(match[4], 10) : undefined
       })
     } else {
       // Fallback for custom/unorthodox formats
@@ -83,6 +83,23 @@ export async function sendToServerFaro(data: { logs?: ServerLog[]; exceptions?: 
     return
   }
 
+  // Attempt to read the session ID from the active request context if available
+  let sessionId: string | undefined
+  try {
+    const event = (globalThis as any).useEvent?.()
+    if (event) {
+      const h3 = await import('h3')
+      sessionId = h3.getRequestHeader(event, 'x-faro-session-id')
+    }
+  } catch (err) {
+    // Ignore context error outside of request
+  }
+
+  // Generate fallback session ID if not found to satisfy Faro collector
+  if (!sessionId) {
+    sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+  }
+
   // Format exceptions to follow the required Faro schema
   const formattedExceptions: ServerExceptionOutput[] = (data.exceptions || []).map((exc) => {
     return {
@@ -105,6 +122,9 @@ export async function sendToServerFaro(data: { logs?: ServerLog[]; exceptions?: 
         version: faroAppVersion,
         environment: faroEnv,
       },
+      session: {
+        id: sessionId,
+      },
       browser: {
         name: 'Node.js',
         version: process.version,
@@ -120,6 +140,7 @@ export async function sendToServerFaro(data: { logs?: ServerLog[]; exceptions?: 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Faro-Session-Id': sessionId,
       },
       body: payload,
     })
